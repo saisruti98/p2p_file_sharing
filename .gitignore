@@ -1,2 +1,4 @@
 # Files to ignore
 *.class
+settings.json
+*.log
