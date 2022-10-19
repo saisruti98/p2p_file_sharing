@@ -1,4 +1,5 @@
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,8 +9,11 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.net.SocketAddress;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileReader;
 
@@ -35,9 +39,12 @@ public class PeerProcess
                 // Make a TCP connection to that peer
 			    peerSocket = new Socket(peer.peerAddress,Integer.parseInt(peer.peerPort));
                 // Send current peerID to the other peer
-                ObjectOutputStream out = new ObjectOutputStream(peerSocket.getOutputStream()); 
-                out.writeObject(currPeerID); 
-                out.flush();
+                Handshake msg = new Handshake(Integer.parseInt(currPeerID));
+                //ByteArrayOutputStream bos = new ByteArrayOutputStream();    
+                DataOutputStream out = new DataOutputStream(peerSocket.getOutputStream()); 
+                
+                out.write(msg.handshakeMsg); 
+                //out.flush();
                 // Add the peerID and its socket to the map
                 peerSocketMap.put(peer.peerId, peerSocket);
                 
@@ -46,6 +53,7 @@ public class PeerProcess
             }
 		}
 		catch (IOException e) {
+            e.printStackTrace();
     			System.err.println("Connection to peer failed. Peer initialised?");
 		} 
 	}
@@ -90,17 +98,38 @@ public class PeerProcess
             }
 
             in.close();
+            for(Map.Entry<Integer,Socket>entry: peerSocketMap.entrySet())
+            {
+                System.out.println(entry.getKey() + " " + entry.getValue());
+            }
 
             // Keep the socket open for other peers to connect. Receives the peerID of the connecting node
             while(true){
                 Socket socket = mySocket.accept();
-                ObjectInputStream input = new ObjectInputStream(socket.getInputStream()); 
-                String callerPeerID = (String)input.readObject();
-                logger.info("Peer " + inputPeerID + " is connected from Peer " + callerPeerID);
+                SocketAddress ss = socket.getRemoteSocketAddress();
+                System.out.println(ss);
+                System.out.println(socket);
+                DataInputStream input = new DataInputStream(socket.getInputStream()); 
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte buffer[] = new byte[32];
+                baos.write(buffer, 0 , input.read(buffer));
+                //byte[] msg1 = (byte [])input.read();
+                String s = new String(buffer, StandardCharsets.UTF_8);
+                System.out.println(s);
+                s = s.substring(28);
+                Handshake msg = new Handshake(myPeerID);
+                int caller = Integer.parseInt(s);
+                Socket callersocket = peerSocketMap.get(caller);
+                System.out.println(callersocket);
+                DataOutputStream out = new DataOutputStream(callersocket.getOutputStream()); 
+                out.write(msg.handshakeMsg); 
+                
+                logger.info("Peer " + inputPeerID + " is connected from Peer " + s);
             }
         }
-        catch (IOException | ClassNotFoundException e)
+        catch (IOException e)
         {
+            e.printStackTrace();
             System.out.println("File/Class not found");
         }
     }
