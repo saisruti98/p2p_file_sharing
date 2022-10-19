@@ -50,7 +50,7 @@ public class PeerProcess
                     baos.write(buffer, 0 , input.read(buffer));
                     recHandshake = new Handshake(buffer);
                     
-                    if(recHandshake.header == msg.header){
+                    if(recHandshake.header.equals(msg.header)){
                         if(recHandshake.peerID == peer.peerId){
                             System.out.println("Yayyyyy");
                             // YAYyyyyyyy
@@ -121,10 +121,12 @@ public class PeerProcess
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 byte buffer[] = new byte[32];
                 baos.write(buffer, 0 , input.read(buffer));
-    
-                Handshake msg = new Handshake(buffer);
-                int callerPeerID = msg.peerID;
+
+                Handshake recMsg = new Handshake(buffer);
+                int callerPeerID = recMsg.peerID;
                 peerSocketMap.put(callerPeerID, socket);
+
+                Handshake msg= new Handshake(myPeerID);
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream()); 
                 out.write(msg.handshakeMsg); 
                 
