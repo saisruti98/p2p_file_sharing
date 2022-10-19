@@ -1,5 +1,7 @@
 import java.net.Socket;
 import java.net.ServerSocket;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Vector;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
@@ -13,8 +15,10 @@ import java.io.FileReader;
 
 public class PeerProcess 
 {
+    public static int myPeerID;
     public static ServerSocket mySocket;
     public static Vector<PeerInfo> peerInfo = new Vector<PeerInfo>();
+    public static Map<Integer, Socket> peerSocketMap = new HashMap<Integer, Socket>();
     public static Logger logger = Logger.getLogger("PeerLog");
 
     public static void connectToPeers(String currPeerID, int currIndex)
@@ -22,7 +26,7 @@ public class PeerProcess
         Socket peerSocket; 
 		
         
-        // Unsure if the connections stay intact after program exits the control from this snippet! Have to figure out!!!
+        // Unsure if the connections stay intact after program exits the control from this snippet! Have to figure out!!! Maybe store the socket info to map?
 
         try{
             for(int i = 0; i< currIndex; i++){
@@ -30,9 +34,12 @@ public class PeerProcess
                 PeerInfo peer = peerInfo.get(i);
                 // Make a TCP connection to that peer
 			    peerSocket = new Socket(peer.peerAddress,Integer.parseInt(peer.peerPort));
+                // Send current peerID to the other peer
                 ObjectOutputStream out = new ObjectOutputStream(peerSocket.getOutputStream()); 
                 out.writeObject(currPeerID); 
                 out.flush();
+                // Add the peerID and its socket to the map
+                peerSocketMap.put(peer.peerId, peerSocket);
                 
                 // Should be sent to a log file along with timestamp
 			    logger.info("Peer " + currPeerID + " makes a connection to Peer " + peer.peerId);
@@ -44,6 +51,7 @@ public class PeerProcess
 	}
     public static void main(String[] args) {
         String inputPeerID = args[0];
+        myPeerID = Integer.parseInt(inputPeerID);
         System.out.println(inputPeerID);
         
         int index = 0;
@@ -51,6 +59,7 @@ public class PeerProcess
         String parentDir = new File (System.getProperty("user.dir")).getParent();
 
         try {
+            // Add handler for logging current node's logs
             FileHandler logFileHandler = new FileHandler(parentDir + "/log_peer_" + inputPeerID + ".log");
             SimpleFormatter formatter = new SimpleFormatter();  
             
@@ -67,12 +76,9 @@ public class PeerProcess
                 System.out.println(currentPeerID);
                 
                 if (!currentPeerID.equals(inputPeerID)){
-                    peerInfo.addElement(new PeerInfo(value[0], value[1], value[2]));
+                    peerInfo.addElement(new PeerInfo(Integer.parseInt(value[0]), value[1], value[2]));
                 }else{
                     String port = value[2];
-
-                    // Add handler for logging current node's logs
-                   
                     // Create a socket at the port for TCP connections
                     mySocket = new ServerSocket(Integer.parseInt(port));
                     logger.info("Socket created\n");
@@ -85,6 +91,7 @@ public class PeerProcess
 
             in.close();
 
+            // Keep the socket open for other peers to connect. Receives the peerID of the connecting node
             while(true){
                 Socket socket = mySocket.accept();
                 ObjectInputStream input = new ObjectInputStream(socket.getInputStream()); 
@@ -94,7 +101,7 @@ public class PeerProcess
         }
         catch (IOException | ClassNotFoundException e)
         {
-            System.out.println("File not found");
+            System.out.println("File/Class not found");
         }
     }
 }
