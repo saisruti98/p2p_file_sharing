@@ -1,5 +1,4 @@
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,8 +7,6 @@ import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.net.SocketAddress;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -42,9 +39,29 @@ public class PeerProcess
                 Handshake msg = new Handshake(Integer.parseInt(currPeerID));
                 //ByteArrayOutputStream bos = new ByteArrayOutputStream();    
                 DataOutputStream out = new DataOutputStream(peerSocket.getOutputStream()); 
-                
                 out.write(msg.handshakeMsg); 
-                //out.flush();
+
+                Handshake recHandshake = null;
+
+                while (recHandshake == null){
+                    DataInputStream input = new DataInputStream(peerSocket.getInputStream()); 
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    byte buffer[] = new byte[32];
+                    baos.write(buffer, 0 , input.read(buffer));
+                    recHandshake = new Handshake(buffer);
+                    
+                    if(recHandshake.header == msg.header){
+                        if(recHandshake.peerID == peer.peerId){
+                            System.out.println("Yayyyyy");
+                            // YAYyyyyyyy
+                        }else{
+                            System.out.println("Wrong peerid");
+                        }
+                    }else{
+                        System.out.println("Wrong header");
+                    }
+                }
+                
                 // Add the peerID and its socket to the map
                 peerSocketMap.put(peer.peerId, peerSocket);
                 
