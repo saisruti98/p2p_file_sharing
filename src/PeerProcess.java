@@ -10,7 +10,6 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -27,6 +26,8 @@ public class PeerProcess implements Constants
     public static Map<Integer, Socket> peerSocketMap = new HashMap<Integer, Socket>();
     public static Logger logger = Logger.getLogger("PeerLog");
     public static BitSet myBitMap;
+    public static Map<Integer, BitSet> peerBitMap = new HashMap<Integer, BitSet>();
+    public static Map<Integer, Boolean> peerIsInterested = new HashMap<Integer, Boolean>();
     
     // Loaded from the config file
     public static int numPreferredNeighbors;
@@ -37,7 +38,18 @@ public class PeerProcess implements Constants
     public static int pieceSize;
     public static int totalPieces;
 
-    
+    public static boolean isInterested(int peerID){
+        BitSet peerBitSet = peerBitMap.get(peerID);
+
+        for(int i = 0; i < totalPieces; i++){
+            if(myBitMap.get(i) == false && peerBitSet.get(i) == true){
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     public static void connectToPeers(String currPeerID, int currIndex)
 	{
         Socket peerSocket; 
@@ -71,12 +83,55 @@ public class PeerProcess implements Constants
                             // Should be sent to a log file along with timestamp
 			                logger.info("Peer " + currPeerID + " makes a connection to Peer " + peer.peerId);
                             
-                            System.out.println(myBitMap);
-                            System.out.println(myBitMap.toByteArray()[0]);
-                            System.out.println(myBitMap.toByteArray().length);
                             Message bitFieldMsg = new Message(BITFIELD, myBitMap.toByteArray());
-                            System.out.println("sending byte array of " + bitFieldMsg.message.length);
                             out.write(bitFieldMsg.message);
+
+                            System.out.println("RECEIVE CLIENT ");
+                             // Receive the BITFIELD
+                            int byteCount = input.available();
+                             // Wait until there's a new message in the queue
+                            while(byteCount==0){
+                                 byteCount = input.available();
+                            }
+            
+                            byte bitFieldBuffer[] = new byte[byteCount];
+                            input.read(bitFieldBuffer);
+                                        
+                            Message recBitFieldMsg = new Message(bitFieldBuffer);
+                            System.out.println("VAL" + recBitFieldMsg.getBitSet(totalPieces).get(10));
+                            peerBitMap.put(peer.peerId, recBitFieldMsg.getBitSet(totalPieces));
+
+                            // check if interested in the peer
+                            Message interestedMsg;
+                            if((myBitMap.cardinality() != totalPieces) && (isInterested(peer.peerId))){
+                                interestedMsg =  new Message(INTERESTED, null); 
+                            }else{
+                                interestedMsg =  new Message(NOT_INTERESTED, null);
+                            }
+
+                            out.write(interestedMsg.message);
+
+                            // Receive interested/not interested message
+                            byteCount = input.available();
+                            // Wait until there's a new message in the queue
+                            while(byteCount==0){
+                                byteCount = input.available();
+                            }
+
+                            byte interestedBuffer[] = new byte[byteCount];
+                            input.read(interestedBuffer);
+                            
+                            Message recInterestedMsg = new Message(interestedBuffer);
+                            
+                            // Add it the map to keep track of PeerID's that are interested
+                            if(recInterestedMsg.msgType == INTERESTED){
+                                System.out.println("client interested!!");
+                                peerIsInterested.put(peer.peerId, true);
+                            }else if(recInterestedMsg.msgType == NOT_INTERESTED){
+                                System.out.println("client not interested!!");
+                                peerIsInterested.put(peer.peerId, false);
+                            }   
+
                         }else{
                             System.out.println("Wrong peerid");
                         }
@@ -159,23 +214,58 @@ public class PeerProcess implements Constants
                                         
                                         logger.info("Peer " + myPeerID + " is connected from Peer " + callerPeerID);
                                         
+                                        // Receive the BITFIELD
+                                        int byteCount = input.available();
+                                        // Wait until there's a new message in the queue
+                                        while(byteCount==0){
+                                            byteCount = input.available();
+                                        }
+
+                                        byte bitFieldBuffer[] = new byte[byteCount];
+                                        input.read(bitFieldBuffer);
+                                        
+                                        Message recBitFieldMsg = new Message(bitFieldBuffer);
+                                        
+                                        synchronized(this) {
+                                            // Add it the map to keep track of PeerID bitmaps
+                                            peerBitMap.put(callerPeerID, recBitFieldMsg.getBitSet(totalPieces));
+                                        }
+
                                         // Send the bitfield 
                                         Message msg = new Message(BITFIELD, myBitMap.toByteArray());
                                         out.write(msg.message);
 
-                                        int byteCount = input.available();
-                                        byte bitFieldBuffer[] = new byte[byteCount];
-                                        input.read(bitFieldBuffer);
+                                        // Receive interested/not interested message
+                                        byteCount = input.available();
+                                        // Wait until there's a new message in the queue
+                                        while(byteCount==0){
+                                            byteCount = input.available();
+                                        }
+
+                                        byte interestedBuffer[] = new byte[byteCount];
+                                        input.read(interestedBuffer);
                                         
+                                        Message recInterestedMsg = new Message(interestedBuffer);
+                                        
+                                        synchronized(this) {
+                                            // Add it the map to keep track of PeerID's that are interested
+                                            if(recInterestedMsg.msgType == INTERESTED){
+                                                System.out.println("client interested!!");
+                                                peerIsInterested.put(callerPeerID, true);
+                                            }else if(recInterestedMsg.msgType == NOT_INTERESTED){
+                                                System.out.println("client not interested!!");
+                                                peerIsInterested.put(callerPeerID, false);
+                                            }
+                                        }
 
-                                        // byte [] msgLen = new byte[MSG_LEN_FIELD_LEN];
-                                        // baos.write(msgLen, 0 , input.read(msgLen));
-                                        // int recMsgLen = new BigInteger(msgLen).intValue();
+                                        Message interestedMsg;
+                                        if((myBitMap.cardinality() != totalPieces) && (isInterested(callerPeerID))){
+                                            interestedMsg =  new Message(INTERESTED, null); 
+                                        }else{
+                                            interestedMsg =  new Message(NOT_INTERESTED, null);
+                                        }
 
-                                        // byte bitFieldBuffer[] = new byte[recMsgLen];
-                                        // baos.write(msgLen, 0 , input.read(msgLen));
-
-                                        Message recBitFieldMsg = new Message(bitFieldBuffer);
+                                        out.write(interestedMsg.message);
                                     }
                                 }
                             }
@@ -208,6 +298,7 @@ public class PeerProcess implements Constants
 			totalPieces = (int) java.lang.Math.ceil((double)fileSize/(double)pieceSize);     
             System.out.println("Total pieces " + totalPieces);   
 			myBitMap = new BitSet(totalPieces);
+            System.out.println("Created bitmap " + myBitMap + myBitMap.length());
 		} catch (Exception e) {
 			System.out.println("Error in reading Common.cfg");
 		}
