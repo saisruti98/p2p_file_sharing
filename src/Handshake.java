@@ -1,8 +1,8 @@
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 
-public class Handshake implements Serializable {
-    public byte[] handshakeMsg = new byte[32];
+public class Handshake implements Serializable, Constants {
+    public byte[] handshakeMsg = new byte[HS_MSG_LEN];
     public int peerID;
     public String header;
 
@@ -16,8 +16,8 @@ public class Handshake implements Serializable {
      public Handshake(byte[] msg){
         this.handshakeMsg = msg;
         String s = new String(msg, StandardCharsets.UTF_8);
-        String peer = s.substring(28);
-        String header = s.substring(0,18);
+        String peer = s.substring(HS_HEADER_LEN + HS_ZEROBITS_LEN);
+        String header = s.substring(0, HS_HEADER_LEN);
         this.peerID =  Integer.parseInt(peer);
         this.header = header;
      }

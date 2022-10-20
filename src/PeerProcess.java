@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -18,7 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 
-public class PeerProcess 
+public class PeerProcess implements Constants
 {
     public static int myPeerID;
     public static ServerSocket mySocket;
@@ -64,12 +65,18 @@ public class PeerProcess
                     
                     if(recHandshake.header.equals(msg.header)){
                         if(recHandshake.peerID == peer.peerId){
-                            System.out.println("Yayyyyy");
                             // Add the peerID and its socket to the map
                             peerSocketMap.put(peer.peerId, peerSocket);
                 
                             // Should be sent to a log file along with timestamp
 			                logger.info("Peer " + currPeerID + " makes a connection to Peer " + peer.peerId);
+                            
+                            System.out.println(myBitMap);
+                            System.out.println(myBitMap.toByteArray()[0]);
+                            System.out.println(myBitMap.toByteArray().length);
+                            Message bitFieldMsg = new Message(BITFIELD, myBitMap.toByteArray());
+                            System.out.println("sending byte array of " + bitFieldMsg.message.length);
+                            out.write(bitFieldMsg.message);
                         }else{
                             System.out.println("Wrong peerid");
                         }
@@ -136,7 +143,7 @@ public class PeerProcess
 
                                 while (recHandshake == null){ 
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                                    byte buffer[] = new byte[32];
+                                    byte buffer[] = new byte[HS_MSG_LEN];
                                     baos.write(buffer, 0 , input.read(buffer));
 
                                     recHandshake = new Handshake(buffer);
@@ -145,10 +152,30 @@ public class PeerProcess
                                     
                                     if(msgToSend.header.equals(recHandshake.header)){
                                         int callerPeerID = recHandshake.peerID;
+                                        
                                         synchronized(this) {
                                             peerSocketMap.put(callerPeerID, socket);
                                         }
+                                        
                                         logger.info("Peer " + myPeerID + " is connected from Peer " + callerPeerID);
+                                        
+                                        // Send the bitfield 
+                                        Message msg = new Message(BITFIELD, myBitMap.toByteArray());
+                                        out.write(msg.message);
+
+                                        int byteCount = input.available();
+                                        byte bitFieldBuffer[] = new byte[byteCount];
+                                        input.read(bitFieldBuffer);
+                                        
+
+                                        // byte [] msgLen = new byte[MSG_LEN_FIELD_LEN];
+                                        // baos.write(msgLen, 0 , input.read(msgLen));
+                                        // int recMsgLen = new BigInteger(msgLen).intValue();
+
+                                        // byte bitFieldBuffer[] = new byte[recMsgLen];
+                                        // baos.write(msgLen, 0 , input.read(msgLen));
+
+                                        Message recBitFieldMsg = new Message(bitFieldBuffer);
                                     }
                                 }
                             }
