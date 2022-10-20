@@ -105,7 +105,7 @@ public class PeerProcess
                     logger.info("Socket created\n");
 
                     // Set the bitmap
-                    // myBitMap.set(0, totalPieces);
+                    myBitMap.set(0, totalPieces, value[3].equals("1"));
 
                     // Establish connections with the other peers 
                     connectToPeers(currentPeerID, index);
@@ -178,8 +178,7 @@ public class PeerProcess
 			fileSize = Integer.parseInt(prop.getProperty("FileSize"));
 			pieceSize = Integer.parseInt(prop.getProperty("PieceSize"));
 
-
-			totalPieces = (int) java.lang.Math.ceil(fileSize/pieceSize);     
+			totalPieces = (int) java.lang.Math.ceil((double)fileSize/(double)pieceSize);     
             System.out.println("Total pieces " + totalPieces);   
 			myBitMap = new BitSet(totalPieces);
 		} catch (Exception e) {
