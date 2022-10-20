@@ -105,7 +105,7 @@ public class PeerProcess
                     logger.info("Socket created\n");
 
                     // Set the bitmap
-                    myBitMap.set(0, totalPieces);
+                    // myBitMap.set(0, totalPieces);
 
                     // Establish connections with the other peers 
                     connectToPeers(currentPeerID, index);
@@ -124,25 +124,40 @@ public class PeerProcess
         try {
             while(true){
                 Socket socket = mySocket.accept();
-                Handshake recHandshake = null;
+                DataInputStream input = new DataInputStream(socket.getInputStream()); 
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
-                while (recHandshake == null){
-                    DataInputStream input = new DataInputStream(socket.getInputStream()); 
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    byte buffer[] = new byte[32];
-                    baos.write(buffer, 0 , input.read(buffer));
+                Thread listenThread = new Thread(new Runnable(){
+                    public void run()
+                    {
+                        try {
+                            while(true){
+                                Handshake recHandshake = null;
 
-                    recHandshake = new Handshake(buffer);
-                    Handshake msgToSend= new Handshake(myPeerID);
-                    DataOutputStream out = new DataOutputStream(socket.getOutputStream()); 
-                    out.write(msgToSend.handshakeMsg); 
-                    
-                    if(msgToSend.header.equals(recHandshake.header)){
-                        int callerPeerID = recHandshake.peerID;
-                        peerSocketMap.put(callerPeerID, socket);
-                        logger.info("Peer " + myPeerID + " is connected from Peer " + callerPeerID);
+                                while (recHandshake == null){ 
+                                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                    byte buffer[] = new byte[32];
+                                    baos.write(buffer, 0 , input.read(buffer));
+
+                                    recHandshake = new Handshake(buffer);
+                                    Handshake msgToSend= new Handshake(myPeerID); 
+                                    out.write(msgToSend.handshakeMsg); 
+                                    
+                                    if(msgToSend.header.equals(recHandshake.header)){
+                                        int callerPeerID = recHandshake.peerID;
+                                        synchronized(this) {
+                                            peerSocketMap.put(callerPeerID, socket);
+                                        }
+                                        logger.info("Peer " + myPeerID + " is connected from Peer " + callerPeerID);
+                                    }
+                                }
+                            }
+                        } catch (IOException e) {
+                            System.out.println("Failed while peer connection");
+                        }
                     }
-                }
+                });
+                listenThread.start();
             }
         } catch (IOException e) {
             System.out.println("Failed while peer connection");
@@ -164,7 +179,8 @@ public class PeerProcess
 			pieceSize = Integer.parseInt(prop.getProperty("PieceSize"));
 
 
-			totalPieces = (int) java.lang.Math.ceil(fileSize/pieceSize);        
+			totalPieces = (int) java.lang.Math.ceil(fileSize/pieceSize);     
+            System.out.println("Total pieces " + totalPieces);   
 			myBitMap = new BitSet(totalPieces);
 		} catch (Exception e) {
 			System.out.println("Error in reading Common.cfg");
