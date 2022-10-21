@@ -15,9 +15,6 @@ public class Message implements Serializable, Constants {
         int payLoadOffset = MSG_LEN_FIELD_LEN + MSG_TYPE_LEN;
         int totalLen = payLoadOffset + payLoadLen;
 
-        // System.out.println("Payload received " + payLoadLen);
-        // System.out.println("Message created " + totalLen);
-        
         this.msgType= msgType;
         this.msgPayLoad=new byte[payLoadLen];
         this.msgPayLoad= msgPayLoad;
@@ -49,9 +46,6 @@ public class Message implements Serializable, Constants {
         int totalLen = message.length;
         int payLoadOffset = MSG_LEN_FIELD_LEN + MSG_TYPE_LEN;
         
-        // System.out.println("Payload received " + payLoadOffset);
-        // System.out.println("Message created " + totalLen);
-        
         ByteBuffer buffer =  ByteBuffer.allocate(totalLen);
         buffer.put(message);
         byte [] msgLen = new byte[MSG_LEN_FIELD_LEN];
@@ -71,10 +65,6 @@ public class Message implements Serializable, Constants {
         this.msgType = new BigInteger(msgType).intValue();
         this.msgPayLoad = msgPayLoad;
         this.message = message;
-
-        // System.out.println("MSG LEN" + this.msgLen);
-        // System.out.println("MSG TYP" +this.msgType);
-        // System.out.println(msgPayLoad);
     }
 
     public BitSet getBitSet(int totalPieces){
