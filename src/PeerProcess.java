@@ -207,7 +207,7 @@ public class PeerProcess implements Constants
     };
 
     public static void startSharing(){
-        
+
         ScheduledExecutorService scheduler
             = Executors.newScheduledThreadPool(1);
   
@@ -295,6 +295,9 @@ public class PeerProcess implements Constants
                                 }
 
                                 out.write(interestedMsg.message);
+
+                                startSharing();
+                                listenForever(socket,input, out);
                             }        
                         } catch (IOException e) {
                             System.out.println("Failed while peer connection");
@@ -302,10 +305,61 @@ public class PeerProcess implements Constants
                     }
                 });
                 listenThread.start();
-                startSharing();
             }
         } catch (IOException e) {
             System.out.println("Failed while peer connection");
+        }
+    }
+
+    public static void listenForever(Socket socket, DataInputStream input, DataOutputStream out){
+        // infinite listen!!!!
+        while(true){
+            try{
+                int byteCount = input.available();
+                // Wait until there's a new message in the queue
+                while(byteCount==0){
+                    byteCount = input.available();
+                }
+
+                byte newBuffer[] = new byte[byteCount];
+                input.read(newBuffer);
+                
+                Message recMsg = new Message(newBuffer);
+                switch (recMsg.msgType) {
+                    case CHOKE:
+                        
+                        break;
+                
+                    case UNCHOKE:
+                        
+                        break;
+                    
+                    case INTERESTED:
+                        
+                        break;
+                    
+                    case NOT_INTERESTED:
+                        
+                        break;
+                
+                    case HAVE:
+                        
+                        break;
+                    
+                    case REQUEST:
+                        
+                        break;
+                    
+                    case PIECE:
+                        
+                        break;
+                
+                    default:
+                        break;
+                }
+            } catch(IOException e){
+                System.out.println("Problem while listening");
+            }
         }
     }
 
