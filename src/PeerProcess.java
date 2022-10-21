@@ -91,7 +91,6 @@ public class PeerProcess implements Constants
                             Message bitFieldMsg = new Message(BITFIELD, myBitMap.toByteArray());
                             out.write(bitFieldMsg.message);
 
-                            System.out.println("RECEIVE CLIENT ");
                              // Receive the BITFIELD
                             int byteCount = input.available();
                              // Wait until there's a new message in the queue
@@ -103,7 +102,6 @@ public class PeerProcess implements Constants
                             input.read(bitFieldBuffer);
                                         
                             Message recBitFieldMsg = new Message(bitFieldBuffer);
-                            System.out.println("VAL" + recBitFieldMsg.getBitSet(totalPieces).get(10));
                             peerBitMap.put(peer.peerId, recBitFieldMsg.getBitSet(totalPieces));
 
                             // check if interested in the peer
@@ -130,15 +128,11 @@ public class PeerProcess implements Constants
                             
                             // Add it the map to keep track of PeerID's that are interested
                             if(recInterestedMsg.msgType == INTERESTED){
-                                System.out.println("client interested!!");
                                 peerIsInterested.add(peer.peerId);
-                            }else if(recInterestedMsg.msgType == NOT_INTERESTED){
-                                System.out.println("client not interested!!");
-                            }   
+                            }  
                             
                             Thread listenerThread = new Thread(new Runnable(){
                                 public void run(){
-                                    System.out.println("CALLED THREAD!!!");
                                     listenForever(peerSocket, input, out);
                                 }
                             });
@@ -217,13 +211,22 @@ public class PeerProcess implements Constants
     };
 
     public static void startSharing(){
-
-        ScheduledExecutorService scheduler
-            = Executors.newScheduledThreadPool(1);
-  
-        // Scheduling the neighbourFetch
-        scheduler.scheduleAtFixedRate(new setNeighbours(), 0, unchokingInterval, TimeUnit.SECONDS);
-        sendunchokemsg();
+        Thread sharingThread = new Thread(new Runnable(){
+            public void run(){
+                while(true){
+                    synchronized(this){
+                        while(peerIsInterested.size() == 0){
+                        }
+                    }
+                    ScheduledExecutorService scheduler
+                        = Executors.newScheduledThreadPool(1);
+                    // Scheduling the neighbourFetch
+                    scheduler.scheduleAtFixedRate(new setNeighbours(), 0, unchokingInterval, TimeUnit.SECONDS);
+                    sendunchokemsg();
+                }
+            }
+        });
+        sharingThread.start();
     }
 
     public static void listenForPeers(){
@@ -306,7 +309,6 @@ public class PeerProcess implements Constants
 
                                 out.write(interestedMsg.message);
 
-                                startSharing();
                                 listenForever(socket,input, out);
                             }        
                         } catch (IOException e) {
@@ -356,13 +358,11 @@ public class PeerProcess implements Constants
         // infinite listen!!!!
         while(true){
             try{
-                System.out.println("qwrqwrwqwr");
                 int byteCount = input.available();
                 // Wait until there's a new message in the queue
                 while(byteCount==0){
                     byteCount = input.available();
                 }
-                System.out.println("hedsdsdksdfl");
                 byte newBuffer[] = new byte[byteCount];
                 input.read(newBuffer);
                 
@@ -445,6 +445,7 @@ public class PeerProcess implements Constants
             
             loadConfig(commonConfigFile);
             createPeerSocket(peerConfigFile);
+            startSharing();
             listenForPeers();
         }
         catch (IOException e)
