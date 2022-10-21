@@ -1,5 +1,6 @@
 import java.net.Socket;
 import java.net.ServerSocket;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
@@ -32,8 +33,8 @@ public class PeerProcess implements Constants
     public static Logger logger = Logger.getLogger("PeerLog");
     public static BitSet myBitMap;
     public static Map<Integer, BitSet> peerBitMap = new HashMap<Integer, BitSet>();
-    public static List<Integer> peerIsInterested;
-    public static List<Integer> neighborList;
+    public static List<Integer> peerIsInterested = new ArrayList<>();
+    public static List<Integer> neighborList = new ArrayList<>();
     
     // Loaded from the config file
     public static int numPreferredNeighbors;
@@ -58,14 +59,12 @@ public class PeerProcess implements Constants
 
     public static void connectToPeers(String currPeerID, int currIndex)
 	{
-        Socket peerSocket; 
-		
         try{
             for(int i = 0; i< currIndex; i++){
                 // Get the information of peers that are already active(the list of peers are started in order)
                 PeerInfo peer = peerInfo.get(i);
                 // Make a TCP connection to that peer
-			    peerSocket = new Socket(peer.peerAddress,Integer.parseInt(peer.peerPort));
+			    final Socket peerSocket = new Socket(peer.peerAddress,Integer.parseInt(peer.peerPort));
                 // Send current peerID to the other peer
                 Handshake msg = new Handshake(Integer.parseInt(currPeerID));
                 //ByteArrayOutputStream bos = new ByteArrayOutputStream();    
@@ -136,7 +135,14 @@ public class PeerProcess implements Constants
                             }else if(recInterestedMsg.msgType == NOT_INTERESTED){
                                 System.out.println("client not interested!!");
                             }   
-
+                            
+                            Thread listenerThread = new Thread(new Runnable(){
+                                public void run(){
+                                    System.out.println("CALLED THREAD!!!");
+                                    listenForever(peerSocket, input, out);
+                                }
+                            });
+                            listenerThread.start();
                         }else{
                             System.out.println("Wrong peerid");
                         }
@@ -203,6 +209,10 @@ public class PeerProcess implements Constants
                     neighborList.set(i, peerIsInterested.get(random.nextInt(peerIsInterested.size())));
                 }
             }
+
+            for(int i = 0; i < numPreferredNeighbors + 1; i++){
+                System.out.println(neighborList.get(i));
+            }
         }
     };
 
@@ -213,7 +223,7 @@ public class PeerProcess implements Constants
   
         // Scheduling the neighbourFetch
         scheduler.scheduleAtFixedRate(new setNeighbours(), 0, unchokingInterval, TimeUnit.SECONDS);
-
+        sendunchokemsg();
     }
 
     public static void listenForPeers(){
@@ -310,17 +320,49 @@ public class PeerProcess implements Constants
             System.out.println("Failed while peer connection");
         }
     }
+    public static void sendunchokemsg()
+    {
+        while(neighborList.size() == 0){
+        }
+        for(int i = 0; i < numPreferredNeighbors + 1; i ++)
+        {
+            int peerID = neighborList.get(i);
+            try {
+                Socket socket = peerSocketMap.get(peerID);
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
+                Thread sendunchokThread = new Thread(new Runnable() {
+                    public void run()
+                    {
+                            try {
+                                Message unchokeMsg =  new Message(UNCHOKE, null);
+                                out.write(unchokeMsg.message);
+                                logger.info("Unchoke message sent to " + peerID);
+                            } catch (IOException e) {
+                                System.out.println("Failed while sending unchoke message");
+                            }
+                    }
+                });
+                sendunchokThread.start();
+
+            } catch (IOException e) {
+                System.out.println("Failed while sending unchoke message");
+            } 
+
+        }
+    } 
     public static void listenForever(Socket socket, DataInputStream input, DataOutputStream out){
         // infinite listen!!!!
         while(true){
             try{
+                System.out.println("qwrqwrwqwr");
                 int byteCount = input.available();
                 // Wait until there's a new message in the queue
                 while(byteCount==0){
                     byteCount = input.available();
                 }
-
+                System.out.println("hedsdsdksdfl");
                 byte newBuffer[] = new byte[byteCount];
                 input.read(newBuffer);
                 
@@ -331,7 +373,7 @@ public class PeerProcess implements Constants
                         break;
                 
                     case UNCHOKE:
-                        
+                        logger.info("Received Unchoke Message");
                         break;
                     
                     case INTERESTED:
