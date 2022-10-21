@@ -70,6 +70,7 @@ public class Message implements Serializable, Constants {
         this.msgLen = new BigInteger(msgLen).intValue();
         this.msgType = new BigInteger(msgType).intValue();
         this.msgPayLoad = msgPayLoad;
+        this.message = message;
 
         // System.out.println("MSG LEN" + this.msgLen);
         // System.out.println("MSG TYP" +this.msgType);
