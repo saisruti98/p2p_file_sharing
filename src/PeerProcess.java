@@ -249,8 +249,8 @@ public class PeerProcess implements Constants
             synchronized(this){
                 if(!prevneighborList.equals(neighborList)){
                     sendchokemsg(neighborList, prevneighborList);
-                    sendunchokemsg();
                 }
+                sendunchokemsg();
             }
         }
     };
@@ -401,6 +401,7 @@ public class PeerProcess implements Constants
             }
         }
     }
+    
     public static void sendunchokemsg()
     {
         while(neighborList.size() == 0){
@@ -514,6 +515,8 @@ public class PeerProcess implements Constants
 
         int pieceNumber = new BigInteger(pieceNum).intValue();
         myBitMap.set(pieceNumber, true);
+
+        sendHaveMsg(pieceNum);
         
 		try {
             String parentDir = new File (System.getProperty("user.dir")).getParent();
@@ -529,6 +532,38 @@ public class PeerProcess implements Constants
         }
 	
         logger.info("Peer " + myPeerID + " has downloaded the " + pieceNumber + " from " + getSenderPeerID(socket) +". Now the number of pieces it has is " +myBitMap.cardinality());
+    }
+    public static void sendHaveMsg(byte[] pieceNumber){
+        for(Integer peerid : peerSocketMap.keySet()){
+            try {
+                Socket socket = peerSocketMap.get(peerid);
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+                Thread sendHaveThread = new Thread(new Runnable() {
+                    public void run()
+                    {
+                            try {                            
+                                Message haveMsg =  new Message(HAVE, pieceNumber);
+                                out.write(haveMsg.message);
+                            } catch (IOException e) {
+                                System.out.println("Failed while sending have message");
+                            }
+                    }
+                });
+                sendHaveThread.start();
+            } catch (IOException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+            }
+        }
+    }
+
+    public static void handleHave(Socket socket, Message recMsg){
+        int pieceNumber = new BigInteger(recMsg.msgPayLoad).intValue();
+        int peerID = getSenderPeerID(socket);
+
+        peerBitMap.get(peerID).set(pieceNumber,true);
+        
     }
 
     public static void listenForever(Socket socket, DataInputStream input, DataOutputStream out){
@@ -563,7 +598,8 @@ public class PeerProcess implements Constants
                         break;
                 
                     case HAVE:
-                        
+                        logger.info("Received Have Message from " + getSenderPeerID(socket));
+                        handleHave(socket, recMsg);
                         break;
                     
                     case REQUEST:
