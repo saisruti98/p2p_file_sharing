@@ -22,6 +22,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 
 public class PeerProcess implements Constants
@@ -167,12 +168,16 @@ public class PeerProcess implements Constants
                     peerInfo.addElement(new PeerInfo(Integer.parseInt(value[0]), value[1], value[2]));
                 }else{
                     String port = value[2];
+                    Boolean hasFile = value[3].equals("1");
                     // Create a socket at the port for TCP connections
                     mySocket = new ServerSocket(Integer.parseInt(port));
                     logger.info("Socket created\n");
-
                     // Set the bitmap
-                    myBitMap.set(0, totalPieces, value[3].equals("1"));
+                    myBitMap.set(0, totalPieces, hasFile);
+
+                    if(hasFile){
+                        fileBreaker();
+                    }
 
                     // Establish connections with the other peers 
                     connectToPeers(currentPeerID, index);
@@ -186,7 +191,7 @@ public class PeerProcess implements Constants
             System.out.println("File not found");
         }
     }
-    
+
     public static class setNeighbours implements Runnable{
         public void run(){
             // check the downLoad rates and make a list of top n peers from interested list
@@ -423,6 +428,35 @@ public class PeerProcess implements Constants
 			myBitMap = new BitSet(totalPieces);
 		} catch (Exception e) {
 			System.out.println("Error in reading Common.cfg");
+		}
+    }
+
+    public static void fileBreaker(){
+        try {
+            String parentDir = new File (System.getProperty("user.dir")).getParent();
+            String folderPath = parentDir + "/" + myPeerID;
+			FileInputStream fileInput = new FileInputStream(folderPath  + "/" + fileName);
+			byte buffer[] = new byte[pieceSize];
+			int index = 0;
+            new File(folderPath + "/pieces").mkdirs();
+            
+			while (true) {
+				int i = fileInput.read(buffer, 0, pieceSize);
+
+				if (i == -1) 	break;
+
+				String outputFile = folderPath + "/pieces/"  +  index;
+				FileOutputStream fileOutput = new FileOutputStream(outputFile);
+			    fileOutput.write(buffer, 0, i);
+				fileOutput.flush();
+				fileOutput.close();
+				index++;
+			}
+        
+            fileInput.close();
+		} catch (Exception e) {
+            e.printStackTrace();
+			System.out.println("Couldn't Split the file");
 		}
     }
 
