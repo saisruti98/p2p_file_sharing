@@ -1,4 +1,7 @@
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -176,6 +179,10 @@ public class PeerProcess implements Constants
                     myBitMap.set(0, totalPieces, hasFile);
 
                     if(hasFile){
+                        String parentDir = new File (System.getProperty("user.dir")).getParent();
+                        Path srcFile =Paths.get(parentDir + "/" + fileName);
+                        Path dstFile = Paths.get(parentDir + "/" + myPeerID + "/" + fileName);
+                        Files.copy(srcFile,dstFile);
                         fileBreaker();
                     }
 
@@ -439,7 +446,7 @@ public class PeerProcess implements Constants
 			byte buffer[] = new byte[pieceSize];
 			int index = 0;
             new File(folderPath + "/pieces").mkdirs();
-            
+
 			while (true) {
 				int i = fileInput.read(buffer, 0, pieceSize);
 
@@ -465,6 +472,7 @@ public class PeerProcess implements Constants
         myPeerID = Integer.parseInt(inputPeerID);
         
         String parentDir = new File (System.getProperty("user.dir")).getParent();
+        new File(parentDir + "/" + myPeerID).mkdirs();
 
         try {
             // Add handler for logging current node's logs
