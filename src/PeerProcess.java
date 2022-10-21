@@ -5,6 +5,7 @@ import java.nio.file.Paths;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ public class PeerProcess implements Constants
     public static Map<Integer, BitSet> peerBitMap = new HashMap<Integer, BitSet>();
     public static List<Integer> peerIsInterested = new ArrayList<>();
     public static List<Integer> neighborList = new ArrayList<>();
+    public static List<Integer> prevneighborList = new ArrayList<>();
     
     // Loaded from the config file
     public static int numPreferredNeighbors;
@@ -204,20 +206,38 @@ public class PeerProcess implements Constants
             // check the downLoad rates and make a list of top n peers from interested list
             System.out.println("Get neighbors");
             Random random = new Random();  
+            int interestedCount;
+            Collections.copy(prevneighborList, neighborList);
+
+            synchronized(this){
+                interestedCount = peerIsInterested.size();
+            }
 
             // Note that the iteration is done with + 1 to incorporate the random neighbor for now
             if(neighborList.size() == 0){
                 for(int i = 0; i < numPreferredNeighbors + 1; i++){
-                    neighborList.add(peerIsInterested.get(random.nextInt(peerIsInterested.size())));
+                    neighborList.add(peerIsInterested.get(random.nextInt(interestedCount)));
                 }
             }else{
                 for(int i = 0; i < numPreferredNeighbors + 1; i++){
-                    neighborList.set(i, peerIsInterested.get(random.nextInt(peerIsInterested.size())));
+                    neighborList.set(i, peerIsInterested.get(random.nextInt(interestedCount)));
                 }
             }
-
+            
             for(int i = 0; i < numPreferredNeighbors + 1; i++){
-                System.out.println(neighborList.get(i));
+                System.out.println("Cur [" + i + "]" +neighborList.get(i));
+                // System.out.println("Prev [" + i + "]" +prevneighborList.get(i));
+                // neighborList.set(0, 999);
+                // System.out.println("Curx [" + i + "]" +neighborList.get(i));
+                // System.out.println("Prevx [" + i + "]" +prevneighborList.get(i));
+            }
+
+            synchronized(this){
+                System.out.println("Lists equal ?" + prevneighborList.equals(neighborList));
+            if(!prevneighborList.equals(neighborList)){
+                sendchokemsg(neighborList,prevneighborList);
+                sendunchokemsg();
+            }
             }
         }
     };
@@ -225,17 +245,20 @@ public class PeerProcess implements Constants
     public static void startSharing(){
         Thread sharingThread = new Thread(new Runnable(){
             public void run(){
-                while(true){
                     synchronized(this){
                         while(peerIsInterested.size() == 0){
+                            try {
+                                Thread.sleep(2000);
+                            } catch (InterruptedException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }
                         }
                     }
                     ScheduledExecutorService scheduler
                         = Executors.newScheduledThreadPool(1);
                     // Scheduling the neighbourFetch
                     scheduler.scheduleAtFixedRate(new setNeighbours(), 0, unchokingInterval, TimeUnit.SECONDS);
-                    sendunchokemsg();
-                }
             }
         });
         sharingThread.start();
@@ -332,6 +355,36 @@ public class PeerProcess implements Constants
             }
         } catch (IOException e) {
             System.out.println("Failed while peer connection");
+        }
+    }
+    public static void sendchokemsg(List<Integer> neighborList, List<Integer> prevneighborList){
+        for(int i = 0; i < numPreferredNeighbors + 1; i ++)
+        {
+            if(!neighborList.contains(prevneighborList.get(i))){
+                int peerID = prevneighborList.get(i);
+                try {
+                    Socket socket = peerSocketMap.get(peerID);
+                    DataInputStream input = new DataInputStream(socket.getInputStream());
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+    
+                    Thread sendchokThread = new Thread(new Runnable() {
+                        public void run()
+                        {
+                                try {
+                                    Message chokeMsg =  new Message(CHOKE, null);
+                                    out.write(chokeMsg.message);
+                                    logger.info("choke message sent to " + peerID);
+                                } catch (IOException e) {
+                                    System.out.println("Failed while sending choke message");
+                                }
+                        }
+                    });
+                    sendchokThread.start();
+    
+                } catch (IOException e) {
+                    System.out.println("Failed while sending choke message");
+                } 
+            }
         }
     }
     public static void sendunchokemsg()
