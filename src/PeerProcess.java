@@ -563,7 +563,34 @@ public class PeerProcess implements Constants
         int peerID = getSenderPeerID(socket);
 
         peerBitMap.get(peerID).set(pieceNumber,true);
+        try {
+            Message interestedMsg;
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            if((myBitMap.cardinality() != totalPieces) && (isInterested(peerID))){
+                interestedMsg =  new Message(INTERESTED, null); 
+            }else{
+                interestedMsg =  new Message(NOT_INTERESTED, null);
+            } 
+            out.write(interestedMsg.message);
+        } catch (IOException e) {
+            System.out.println("Failed while sending interested/notinterested message");
+        }
         
+    }
+
+    public static void handleInterested(Socket socket, Message recMsg){
+        int peerID = getSenderPeerID(socket);
+        System.out.println(peerID + " is interested.");
+        peerIsInterested.add(peerID);
+    }
+
+    public static void handleNotInterested(Socket socket, Message recMsg){
+        int peerID = getSenderPeerID(socket);
+        System.out.println(peerID + " is not interested.");
+        if(peerIsInterested.contains(peerID))
+        {
+            peerIsInterested.remove(Integer.valueOf(peerID));
+        }
     }
 
     public static void listenForever(Socket socket, DataInputStream input, DataOutputStream out){
@@ -590,11 +617,11 @@ public class PeerProcess implements Constants
                         break;
                     
                     case INTERESTED:
-                        
+                        handleInterested(socket, recMsg);
                         break;
                     
                     case NOT_INTERESTED:
-                        
+                        handleNotInterested(socket,recMsg);
                         break;
                 
                     case HAVE:
